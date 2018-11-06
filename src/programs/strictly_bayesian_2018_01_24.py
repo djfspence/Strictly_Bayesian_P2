@@ -46,7 +46,6 @@ underflow_avoidance = 1e-100   #add to the base and variant probbailities to avo
 #fixed_parameters
 
 num_prob_iters = 10 #number of iterations to compute probability of dance-off
-#comp_prob_norm_std = 1.0 # normal distribution std dev from which next competitor popularity is sampled
 max_judge_score_norm = 40
 
 #********************************************************************************************************************
@@ -299,25 +298,6 @@ def create_competitor_lists(judge_scores):
         full_dict[series] = round_competitor_dict
 
     return valid_series_round, valid_series_competitor, full_dict
-
-
-# def sample_from_log_likelihoods(current_ll, alternate_ll):
-#
-#     current_likelihood = np.exp(current_ll)
-#     alternate_likelihood = np.exp(alternate_ll)
-#
-#     total_likelihood = current_likelihood + alternate_likelihood
-#
-#     current_likelihood_norm = current_likelihood / total_likelihood
-#     alternate_likelihood_norm = alternate_likelihood / total_likelihood
-#
-#     rand_value = np.random.rand()
-#
-#     keep_current = False
-#     if rand_value < current_likelihood_norm:
-#         keep_current = True
-#
-#     return keep_current
 
 def sample_beta(mode, shape):
 
@@ -909,7 +889,7 @@ for iteration in range(1, num_iters): #initial settings are in 0
     # just do with a learning rate
 
     step_std_dev_initial_value = variable_parameters_iterations[3][0]
-    step_std_dev_final_value = 0.2
+    step_std_dev_final_value = 0.3
     step_std_dev_change_per_iter = (step_std_dev_final_value - step_std_dev_initial_value) / (1.0 * num_iters)
 
     variable_parameters_live[3] = step_std_dev_initial_value + (iteration * step_std_dev_change_per_iter)
