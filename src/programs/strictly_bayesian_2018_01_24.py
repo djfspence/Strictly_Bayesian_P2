@@ -2,6 +2,83 @@ __author__ = 'David'
 
 #********************************************************************************************************************
 #
+# Estimation of audience scores in Strictly Come Dancing using MCMC
+
+# 6 November 2018
+
+
+#********************************************************************************************************************
+#
+# Further Development
+
+# 1. Stopping criteria.
+
+# MCMC convergence is tricky!
+# Appears that multiple runs with varied start points is one way to go
+
+# Gelman-Rubin diagnostic ( )
+# Compute m independent Markov chains
+# Compares variance of each chain to pooled variance
+# If initial states (Theta1j) are overdispersed, then approaches unity from above
+# Provides estimate of how much variance could be reduced by running chains
+# longer
+# It is an estimate!
+# http://astrostatistics.psu.edu/RLectures/diagnosticsMCMC.pdf
+
+# do as an added dimension in the arrays, run_number
+# say 5-10 runs?
+# so...start points...I still think these are valid BUT maybe add noise to them and/or have some start points
+# that are simply random
+
+# 2. Further series
+
+# Add the data for other series
+
+
+# 3. Categorised
+
+# Define competitors in terms of their categories and then solve popularity by category
+# Also do by individual - some way of finding individual popularity difference to simple category?
+# Probably only by ranking within a series?
+# Age, gender, ethnicity, slimness, profession (sport, TV, acting, music, politics), parent? (hypothesis -
+# attractive women are OK as long as they are mums?), has been a model at some point
+# = proxy for physical attractiveness? Seems to crop up with a lot of femal tv presenters
+# how to handle the multiple people, former model and singer nor presenting tv show...?
+#
+
+
+
+# 4. Checking and testing
+
+# Use model to generate a set of fake results from given comp pop values then use the model to get back to those values
+# Check the final round is working OK i.e. judges' score does not count
+#
+
+
+# 5. Computing final probability of dance-off
+
+# Given the mean values for competitor popularity - compute the probabilities for each competitor to be in the
+# dance off in each round and line up against what actually happenned
+# interesting to see how big the divergence is
+# good sense check - if it is way off then there is something dodgy happenning
+
+
+# 6. Change judges score
+
+# Instead of normalising simply make each score in [0,1]
+# Worried that later in the competition, with high and almost equal judges scores the normalisation emphasis the
+# difference. Maybe not so much an issue for judge's point but it could be an issue when combining with competitor
+# popularity.
+
+# 7. Checking - series 11
+
+# Natalie Gumede and Abbey Clancy were both in the dance off but are much more popular than Susanna Reid
+# Feels like this is wrong
+# Susanna also beat Sophie Ellis B in round 13 on audience scores BUT again SEB looks to be more popular
+
+
+#********************************************************************************************************************
+#
 # Imports
 
 
@@ -23,9 +100,14 @@ timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 #
 # Key parameters to change
 
-num_iters = 100000
-number_of_slices = 100
-
+#number_of_blocks = 5
+block_size = 10000
+converged_blocks = 10
+burn_in_blocks = 4
+converged = False
+block_number = 0
+max_num_blocks = 5
+max_iters = max_num_blocks * block_size + 1
 
 #********************************************************************************************************************
 #
@@ -34,8 +116,17 @@ number_of_slices = 100
 num_series = 15
 max_rounds = 20
 max_competitors = 20
-#casting_vote_multiplier = 1.001
 num_variable_parameters = 4
+
+# competitors per series plus the overall variable parameters
+block_means_array_size = (max_competitors * num_series) + num_variable_parameters
+
+block_means_array = np.zeros((block_means_array_size, max_num_blocks))
+block_means_array[:] = np.nan
+
+
+
+
 underflow_avoidance = 1e-100   #add to the base and variant probbailities to avoid inf / zero
 
 #beta distribution (maintains uniform sampling until end of burn-in)
@@ -46,7 +137,7 @@ underflow_avoidance = 1e-100   #add to the base and variant probbailities to avo
 #fixed_parameters
 
 num_prob_iters = 10 #number of iterations to compute probability of dance-off
-max_judge_score_norm = 40
+max_judge_score_norm = 1.0
 
 #********************************************************************************************************************
 #
@@ -55,13 +146,7 @@ max_judge_score_norm = 40
 # the main one!
 # popularity of each competitor in the range [0,1]
 
-competitor_series_popularity_current = np.zeros((num_series, max_competitors))
-competitor_series_popularity_current[:] = np.nan
-
-competitor_series_popularity_alternate = np.zeros((num_series, max_competitors))
-competitor_series_popularity_alternate[:] = np.nan
-
-competitor_series_popularity_iterations = np.zeros((num_series, max_competitors, num_iters))
+competitor_series_popularity_iterations = np.zeros((num_series, max_competitors, max_iters))
 competitor_series_popularity_iterations[:] = np.nan
 
 variable_parameters_current = np.zeros((num_variable_parameters))
@@ -70,27 +155,24 @@ variable_parameters_current[:] = np.nan
 variable_parameters_alternate = np.zeros((num_variable_parameters))
 variable_parameters_alternate[:] = np.nan
 
-variable_parameters_iterations = np.zeros((num_variable_parameters, num_iters))
+variable_parameters_iterations = np.zeros((num_variable_parameters, max_iters))
 variable_parameters_iterations[:] = np.nan
 
 log_likelihood_series_current = np.zeros(num_series)  #need to initialise this on first run
 log_likelihood_series_current[:] = np.nan
 
-log_likelihood_series_iterations = np.zeros((num_series, num_iters))
+log_likelihood_series_iterations = np.zeros((num_series, max_iters))
 log_likelihood_series_iterations[:] = np.nan
 
-series_log_like_live_array = np.zeros((num_series, num_iters))
+series_log_like_live_array = np.zeros((num_series, max_iters))
 series_log_like_live_array[:] = np.nan
 
 
 # just the sum of the above
 log_likelihood_total_current = 0   #need to initialise this on first run
-log_likelihood_total_iterations = np.zeros(num_iters)
+log_likelihood_total_iterations = np.zeros(max_iters)
 
-#parameters
-# 0 proportion of judges' score in audience score [0,1]
-# 1 value added to iteration for probability of dance-off to ensure probability is not 0 or 1
-# 2 variance of normal distribution from which audience score 'noise' is selected
+
 
 
 #********************************************************************************************************************
@@ -101,7 +183,11 @@ def round_log_likelihood(series, round, competitor_popularity, variable_params):
 
     '''compute log likelihood of dance-offs for a round given the competitor_popularity and variable-params'''
 
-    competitors_in_round = np.where(~np.isnan(competitor_popularity))[0]
+
+    #think about this carefully - competitor might miss a week...
+
+    #competitors_in_round = np.where(~np.isnan(competitor_popularity))[0]
+    competitors_in_round = series_round_competitor_dict[series][round]
 
     num_competitors = competitor_popularity.shape[0]
 
@@ -113,7 +199,9 @@ def round_log_likelihood(series, round, competitor_popularity, variable_params):
     dance_off_count = np.zeros(num_competitors, dtype=int)
 
     #normalise the judge score so that it is in line with competitor popularity so judge score weight works ok
-    judge_score_round_norm = normalise_vector_std_normal(judge_score_normalised[series, round, :])
+    #judge_score_round_norm = normalise_vector_std_normal(judge_score_normalised[series, round, :])
+
+    judge_score_round_norm = judge_score_normalised[series, round, :]
 
     # audience_score_round is the combination of competitor popularity plus judge's score
 
@@ -134,13 +222,23 @@ def round_log_likelihood(series, round, competitor_popularity, variable_params):
         audience_points = convert_score_to_points(audience_score_round)
 
         #combine judge score and audience score
-        combined_score = judge_points[series, round, :] + audience_points
+
+        if judge_score_counts[series, round]:
+            combined_score = judge_points[series, round, :] + audience_points
+
+        else:
+            combined_score = audience_points
 
         ranked_combined_scores = np.argsort(combined_score)
 
+        #allow for variable number of dance-off positions
+
+        for j in range(num_dancers_dance_off_round[series][round]):
+            dance_off_count[ranked_combined_scores[j]] += 1
+
         #print 'dance_off_competitors', dance_off_competitors
-        dance_off_count[ranked_combined_scores[0]] += 1
-        dance_off_count[ranked_combined_scores[1]] += 1
+        # dance_off_count[ranked_combined_scores[0]] += 1
+        # dance_off_count[ranked_combined_scores[1]] += 1
 
 
     #compute probabilities
@@ -318,6 +416,277 @@ def sample_beta(mode, shape):
 
 # competitors by series
 
+judge_score = np.zeros((num_series, max_rounds, max_competitors))
+judge_score[:] = np.nan
+
+#use max judge score to mormalise judge scores into [0,1]
+max_judge_score = np.zeros((num_series, max_rounds))
+max_judge_score[:] = np.nan
+
+judge_points = np.zeros((num_series, max_rounds, max_competitors))
+judge_points[:] = np.nan
+
+popularity_score = np.zeros((num_series, max_rounds, max_competitors))
+popularity_score[:] = np.nan
+
+audience_points = np.zeros((num_series, max_rounds, max_competitors))
+audience_points[:] = np.nan
+
+combined_points = np.zeros((num_series, max_rounds, max_competitors))
+combined_points[:] = np.nan
+
+competitor_in_dance_off = np.full((num_series, max_rounds, max_competitors), False, dtype=bool)
+
+judge_score_counts = np.full((num_series, max_rounds), True, dtype=bool)
+
+competitor_name_by_series_dict = {}
+
+# =1 if this was an elimination round in the series
+
+
+
+
+# need to do this by import from csv ideally
+
+
+#********************************************************************************************************************
+#
+# Series 11 data
+
+#the final (round 13) has two votes so it is considered here as two rounds, 13 and 14
+
+
+series = 11
+
+competitor_name_dict = {}
+competitor_name_dict[1] = 'Abbey Clancy'
+competitor_name_dict[2] = 'Susanna Reid'
+competitor_name_dict[3] = 'Natalie Gumede'
+competitor_name_dict[4] = 'Sophie Ellis-Bextor'
+competitor_name_dict[5] = 'Patrick Robinson'
+competitor_name_dict[6] = 'Ashley Taylor Dawson'
+competitor_name_dict[7] = 'Mark Benton'
+competitor_name_dict[8] = 'Ben Cohen'
+competitor_name_dict[9] = 'Fiona Fullerton'
+competitor_name_dict[10] = 'Dave Myers'
+competitor_name_dict[11] = 'Rachel Riley'
+competitor_name_dict[12] = 'Deborah Meaden'
+competitor_name_dict[13] = 'Julien Macdonald'
+competitor_name_dict[14] = 'Vanessa Feltz'
+competitor_name_dict[15] = 'Tony Jacklin'
+
+competitor_name_by_series_dict[series] = competitor_name_dict
+
+competitor_position_dict = {}
+
+for i in range(15):
+    competitor_position_dict[i+1] = i+1
+
+competitor_position_by_series_dict = {}
+competitor_position_by_series_dict[series] = competitor_position_dict
+
+
+#use max judge score to mormalise judge scores into [0,1]
+max_judge_score[11][2] = 80
+max_judge_score[11][3] = 40
+max_judge_score[11][4] = 40
+max_judge_score[11][5] = 40
+max_judge_score[11][6] = 40
+max_judge_score[11][7] = 40
+max_judge_score[11][8] = 40
+max_judge_score[11][9] = 40
+max_judge_score[11][10] = 40
+max_judge_score[11][11] = 46
+max_judge_score[11][12] = 80
+max_judge_score[11][13] = 80
+max_judge_score[11][14] = 120
+
+judge_score[11][2][1] = 62
+judge_score[11][3][1] = 28
+judge_score[11][4][1] = 35
+judge_score[11][5][1] = 35
+judge_score[11][6][1] = 34
+judge_score[11][7][1] = 36
+judge_score[11][8][1] = 37
+judge_score[11][9][1] = 32
+judge_score[11][10][1] = 40
+judge_score[11][11][1] = 40
+judge_score[11][12][1] = 78
+judge_score[11][13][1] = 78
+judge_score[11][14][1] = 116
+
+judge_score[11][2][2] = 65
+judge_score[11][3][2] = 36
+judge_score[11][4][2] = 35
+judge_score[11][5][2] = 35
+judge_score[11][6][2] = 38
+#judge_score[11][7][2] = did not compete
+judge_score[11][8][2] = 39
+judge_score[11][9][2] = 37
+judge_score[11][10][2] = 36
+judge_score[11][11][2] = 41
+judge_score[11][12][2] = 78
+judge_score[11][13][2] = 79
+judge_score[11][14][2] = 119
+
+judge_score[11][2][3] = 59
+judge_score[11][3][3] = 34
+judge_score[11][4][3] = 29
+judge_score[11][5][3] = 32
+judge_score[11][6][3] = 34
+judge_score[11][7][3] = 36
+judge_score[11][8][3] = 39
+judge_score[11][9][3] = 31
+judge_score[11][10][3] = 33
+judge_score[11][11][3] = 33
+judge_score[11][12][3] = 70
+judge_score[11][13][3] = 73
+judge_score[11][14][3] = 112
+
+judge_score[11][2][4] = 64
+judge_score[11][3][4] = 31
+judge_score[11][4][4] = 35
+judge_score[11][5][4] = 30
+judge_score[11][6][4] = 28
+judge_score[11][7][4] = 32
+judge_score[11][8][4] = 34
+judge_score[11][9][4] = 31
+judge_score[11][10][4] = 36
+judge_score[11][11][4] = 38
+judge_score[11][12][4] = 71
+judge_score[11][13][4] = 74
+
+judge_score[11][2][5] = 55
+judge_score[11][3][5] = 27
+judge_score[11][4][5] = 33
+judge_score[11][5][5] = 28
+judge_score[11][6][5] = 34
+judge_score[11][7][5] = 37
+judge_score[11][8][5] = 35
+judge_score[11][9][5] = 32
+judge_score[11][10][5] = 38
+judge_score[11][11][5] = 41
+judge_score[11][12][5] = 69
+
+judge_score[11][2][6] = 57
+judge_score[11][3][6] = 31
+judge_score[11][4][6] = 31
+judge_score[11][5][6] = 31
+judge_score[11][6][6] = 33
+judge_score[11][7][6] = 35
+judge_score[11][8][6] = 35
+judge_score[11][9][6] = 35
+judge_score[11][10][6] = 35
+judge_score[11][11][6] = 37
+
+judge_score[11][2][7] = 46
+judge_score[11][3][7] = 26
+judge_score[11][4][7] = 26
+judge_score[11][5][7] = 28
+judge_score[11][6][7] = 25
+judge_score[11][7][7] = 23
+judge_score[11][8][7] = 29
+judge_score[11][9][7] = 28
+judge_score[11][10][7] = 29
+
+judge_score[11][2][8] = 44
+judge_score[11][3][8] = 28
+judge_score[11][4][8] = 31
+judge_score[11][5][8] = 27
+judge_score[11][6][8] = 32
+judge_score[11][7][8] = 26
+judge_score[11][8][8] = 32
+judge_score[11][9][8] = 27
+
+judge_score[11][2][9] = 46
+judge_score[11][3][9] = 28
+judge_score[11][4][9] = 22
+judge_score[11][5][9] = 30
+judge_score[11][6][9] = 28
+judge_score[11][7][9] = 26
+judge_score[11][8][9] = 29
+
+judge_score[11][2][10] = 33
+judge_score[11][3][10] = 16
+judge_score[11][4][10] = 23
+judge_score[11][5][10] = 17
+judge_score[11][6][10] = 19
+judge_score[11][7][10] = 20
+
+judge_score[11][2][11] = 47
+judge_score[11][3][11] = 27
+judge_score[11][4][11] = 26
+judge_score[11][5][11] = 22
+judge_score[11][6][11] = 30
+
+judge_score[11][2][12] = 48
+judge_score[11][3][12] = 28
+judge_score[11][4][12] = 23
+judge_score[11][5][12] = 27
+
+judge_score[11][2][13] = 38
+judge_score[11][3][13] = 22
+judge_score[11][4][13] = 23
+
+judge_score[11][2][14] = 42
+judge_score[11][3][14] = 20
+
+judge_score[11][2][15] = 29
+
+#judge scores counting (i.e. if not audience score only...)
+#defaulted to tru so only need to add the false values
+
+judge_score_counts[11][13] = False
+judge_score_counts[11][14] = False
+
+#input dance-offs
+
+competitor_in_dance_off[11][2][13] = True
+competitor_in_dance_off[11][2][15] = True
+
+competitor_in_dance_off[11][3][13] = True
+competitor_in_dance_off[11][3][14] = True
+
+competitor_in_dance_off[11][4][11] = True
+competitor_in_dance_off[11][4][13] = True
+
+competitor_in_dance_off[11][5][5] = True
+competitor_in_dance_off[11][5][12] = True
+
+competitor_in_dance_off[11][6][1] = True
+competitor_in_dance_off[11][6][11] = True
+
+competitor_in_dance_off[11][7][7] = True
+competitor_in_dance_off[11][7][10] = True
+
+competitor_in_dance_off[11][8][7] = True
+competitor_in_dance_off[11][8][9] = True
+
+competitor_in_dance_off[11][9][7] = True
+competitor_in_dance_off[11][9][8] = True
+
+competitor_in_dance_off[11][10][6] = True
+competitor_in_dance_off[11][10][7] = True
+
+competitor_in_dance_off[11][11][5] = True
+competitor_in_dance_off[11][11][6] = True
+
+competitor_in_dance_off[11][12][2] = True
+competitor_in_dance_off[11][12][5] = True
+
+#one person eliminated directly
+competitor_in_dance_off[11][13][4] = True
+
+#i.e. the two runners-up
+competitor_in_dance_off[11][14][2] = True
+competitor_in_dance_off[11][14][3] = True
+
+
+
+#********************************************************************************************************************
+#
+# Series 14 data
+
 # series 14
 
 # Couple	  Place	    1	2	1+2	3	4	5	6	7	8	9	10	11	12	13
@@ -369,40 +738,9 @@ def sample_beta(mode, shape):
 # Ore Oduba	BBC Sport presenter	Joanne Clifton	Winners
 # on 17 December 2016
 
-
-
-judge_score = np.zeros((num_series, max_rounds, max_competitors))
-judge_score[:] = np.nan
-
-#use max judge score to mormalise judge scores into [0,1]
-max_judge_score = np.zeros((num_series, max_rounds))
-max_judge_score[:] = np.nan
-
-judge_points = np.zeros((num_series, max_rounds, max_competitors))
-judge_points[:] = np.nan
-
-popularity_score = np.zeros((num_series, max_rounds, max_competitors))
-popularity_score[:] = np.nan
-
-audience_points = np.zeros((num_series, max_rounds, max_competitors))
-audience_points[:] = np.nan
-
-combined_points = np.zeros((num_series, max_rounds, max_competitors))
-combined_points[:] = np.nan
-
-competitor_in_dance_off = np.full((num_series, max_rounds, max_competitors), False, dtype=bool)
-
-# =1 if this was an elimination round in the series
-
-
-competitor_name_dict = {}
-
-# need to do this by import from csv ideally
-
-# data for series 14
-
 series = 14
 
+competitor_name_dict = {}
 competitor_name_dict[1] = 'Ore Oduba'
 competitor_name_dict[2] = 'Danny Mac'
 competitor_name_dict[3] = 'Louise Redknapp'
@@ -419,7 +757,6 @@ competitor_name_dict[13] = 'Will Young'
 competitor_name_dict[14] = 'Tameka Empson'
 competitor_name_dict[15] = 'Melvin Odoom'
 
-competitor_name_by_series_dict = {}
 competitor_name_by_series_dict[series] = competitor_name_dict
 
 competitor_position_dict = {}
@@ -537,7 +874,7 @@ judge_score[14][8][8] = 31
 judge_score[14][2][9] = 57
 judge_score[14][3][9] = 30
 judge_score[14][4][9] = 33
-judge_score[14][5][9] = 0
+#judge_score[14][5][9] = 0 missed a week
 judge_score[14][6][9] = 36
 judge_score[14][7][9] = 32
 
@@ -570,6 +907,8 @@ judge_score[14][2][14] = 55
 judge_score[14][3][14] = 28
 
 judge_score[14][2][15] = 45
+
+judge_score_counts[14][13] = False
 
 #input dance-offs
 
@@ -677,6 +1016,20 @@ for series in series_list:
             judge_score_normalised[series, round, competitor] = max_judge_score_norm * judge_score[series, round, competitor] / max_judge_score[series, round]
             print series, round, competitor, judge_score[series, round, competitor], judge_score_normalised[series, round, competitor]
 
+print '** Number of dancers in dance-off'
+
+#usually two but in finals can be 1,2 or 3
+
+num_dancers_dance_off_round = np.zeros((num_series, max_rounds), dtype=int)
+
+for series in series_list:
+    for round in range(max_rounds):
+        for competitor in range(max_competitors):
+            if competitor_in_dance_off[series][round][competitor]:
+                num_dancers_dance_off_round[series][round] += 1
+
+
+
 
 #********************************************************************************************************************
 #
@@ -756,158 +1109,217 @@ variable_parameters_iterations[3][0] = 1.0
 #
 # Main program
 
-for iteration in range(1, num_iters): #initial settings are in 0
+while not converged:
 
-    variable_parameters_live = variable_parameters_iterations[:, iteration - 1]
+    print 'block_number', block_number
 
-    print 'iteration', iteration
+    for block_iteration in range(0, block_size): #initial settings are in 0
 
-    for series in series_list:
+        iteration = block_iteration + (block_number * block_size)
 
-        #print 'series', series
+        variable_parameters_live = variable_parameters_iterations[:, iteration]
 
-        #initialise competitor popularity and variable parameters by copying values from the
-        # previous iteration into this iteration
-        competitor_popularity_live = competitor_series_popularity_iterations[series, :, iteration - 1]
+        #print 'iteration', iteration
 
-        comp_prob_norm_std = variable_parameters_live[3]
+        for series in series_list:
 
-        # compute series_log_like_live for live values of competitor popularity and variable parameters
-        series_log_like_live = series_log_like(series, competitor_popularity_live, variable_parameters_live)
+            #print 'series', series
 
-        max_series_log_like_live = series_log_like_live
+            #initialise competitor popularity and variable parameters by copying values from the
+            # previous iteration into this iteration
+            competitor_popularity_live = competitor_series_popularity_iterations[series, :, iteration]
 
-        for competitor in range(max_competitors):
-            if valid_series_competitor[series, competitor]:
+            comp_prob_norm_std = variable_parameters_live[3]
 
-                competitor_popularity_live_variant = np.copy(competitor_popularity_live)
-                # make a step from current value for active competitor
+            # compute series_log_like_live for live values of competitor popularity and variable parameters
+            series_log_like_live = series_log_like(series, competitor_popularity_live, variable_parameters_live)
 
-                competitor_popularity_live_variant[competitor] = np.random.normal(competitor_popularity_live[competitor], comp_prob_norm_std)
+            max_series_log_like_live = series_log_like_live
 
-                # normalise the vector
-                competitor_popularity_live_variant = normalise_vector_std_normal(competitor_popularity_live_variant)
+            for competitor in range(max_competitors):
+                if valid_series_competitor[series, competitor]:
 
-                # compute series log-likelihood for this variant
-                series_log_like_variant = series_log_like(series, competitor_popularity_live_variant, variable_parameters_live)
+                    competitor_popularity_live_variant = np.copy(competitor_popularity_live)
+                    # make a step from current value for active competitor
 
-                # sample existing OR variant based on probabilities
-                base_prob_non_norm = np.exp(series_log_like_live) + underflow_avoidance
-                variant_prob_non_norm = np.exp(series_log_like_variant) + underflow_avoidance
-                total_prob = base_prob_non_norm + variant_prob_non_norm
-                base_prob_norm = base_prob_non_norm / total_prob
+                    competitor_popularity_live_variant[competitor] = np.random.normal(competitor_popularity_live[competitor], comp_prob_norm_std)
 
-                rand_value = np.random.rand()
+                    # normalise the vector
+                    competitor_popularity_live_variant = normalise_vector_std_normal(competitor_popularity_live_variant)
 
-                if rand_value > base_prob_norm:
-                    select_variant = True
-                    #then set live to be equal to the variant
-                    competitor_popularity_live = np.copy(competitor_popularity_live_variant)
-                    series_log_like_live = series_log_like_variant
+                    # compute series log-likelihood for this variant
+                    series_log_like_variant = series_log_like(series, competitor_popularity_live_variant, variable_parameters_live)
 
-                else:
-                    select_variant = False
-                    #competitor_popularity_live = competitor_popularity_live_base.copy
-                    #competitor_popularity_live is unchanged
+                    # sample existing OR variant based on probabilities
+                    base_prob_non_norm = np.exp(series_log_like_live) + underflow_avoidance
+                    variant_prob_non_norm = np.exp(series_log_like_variant) + underflow_avoidance
+                    total_prob = base_prob_non_norm + variant_prob_non_norm
+                    base_prob_norm = base_prob_non_norm / total_prob
 
-                if series_log_like_live > max_series_log_like_live:
-                    max_series_log_like_live = series_log_like_live
+                    rand_value = np.random.rand()
 
-        # now at this point it should have looped through all the competitors and we have a revised
-        # competitor_popularity_live vector for this series
-        # using this revised vector we do the same process for the variable parameters
+                    if rand_value > base_prob_norm:
+                        select_variant = True
+                        #then set live to be equal to the variant
+                        competitor_popularity_live = np.copy(competitor_popularity_live_variant)
+                        series_log_like_live = series_log_like_variant
 
-        competitor_series_popularity_iterations[series, :, iteration] = competitor_popularity_live
+                    else:
+                        select_variant = False
+                        #competitor_popularity_live = competitor_popularity_live_base.copy
+                        #competitor_popularity_live is unchanged
 
-        series_log_like_live_array[series, iteration] = max_series_log_like_live
+                    if series_log_like_live > max_series_log_like_live:
+                        max_series_log_like_live = series_log_like_live
 
-    #write the set of competitor popularities for all series for this iteration
-    competitor_series_popularity = competitor_series_popularity_iterations[:, :, iteration]
+            # now at this point it should have looped through all the competitors and we have a revised
+            # competitor_popularity_live vector for this series
+            # using this revised vector we do the same process for the variable parameters
 
-    #set the live value
-    all_series_log_like_live = all_series_log_likelihood(competitor_series_popularity, variable_parameters_live)
+            competitor_series_popularity_iterations[series, :, iteration+1] = competitor_popularity_live
 
-    ############################################################################################
+            series_log_like_live_array[series, iteration+1] = max_series_log_like_live
+
+        #write the set of competitor popularities for all series for this iteration
+        competitor_series_popularity = competitor_series_popularity_iterations[:, :, iteration+1]
+
+        #set the live value
+        all_series_log_like_live = all_series_log_likelihood(competitor_series_popularity, variable_parameters_live)
+
+        ############################################################################################
+        #
+        # 0 judge_score_weight
+
+        beta_width_factor = 10.0
+        judge_score_weight_min = 0.0
+        judge_score_weight_max = 0.8
+        judge_score_weight_span = judge_score_weight_max - judge_score_weight_min
+
+        variable_parameter_live = variable_parameters_live[0]
+
+        mode = 1.0 * (variable_parameter_live - judge_score_weight_min) / judge_score_weight_span
+        a = (mode * (1.0 * beta_width_factor - 2.0)) + 1.0
+        b = beta_width_factor - a
+        mode_new = np.random.beta(a, b)
+
+        variable_parameter_variant = (mode_new * judge_score_weight_span) + judge_score_weight_min
+
+        variable_parameters_variant = np.copy(variable_parameters_live)
+        variable_parameters_variant[0] = variable_parameter_variant
+
+        all_series_log_like_variant = all_series_log_likelihood(competitor_series_popularity, variable_parameters_variant)
+
+        base_prob_non_norm = np.exp(all_series_log_like_live) + underflow_avoidance
+        variant_prob_non_norm = np.exp(all_series_log_like_variant) + underflow_avoidance
+        total_prob = base_prob_non_norm + variant_prob_non_norm
+        base_prob_norm = base_prob_non_norm / total_prob
+
+        rand_value = np.random.rand()
+
+        if rand_value > base_prob_norm:
+            select_variant = True
+            # then set live to be equal to the variant
+            variable_parameters_live = np.copy(variable_parameters_variant)
+            all_series_log_like_live = all_series_log_like_variant
+
+        else:
+            select_variant = False
+            # then keep current live values
+
+        #print 'judge_score_weight', variable_parameter_live
+
+        ############################################################################################
+        #
+        # 1 epsilon_counts
+
+        # leave fixed for now
+
+        ############################################################################################
+        #
+        # 2 noise_std_dev
+
+        # leave fixed for now
+
+
+        ############################################################################################
+        #
+        # 3 step_std_dev
+
+        # just do with a learning rate
+
+        step_std_dev_initial_value = variable_parameters_iterations[3][0]
+        step_std_dev_final_value = 0.3
+        step_std_dev_change_per_iter = (step_std_dev_final_value - step_std_dev_initial_value) / (1.0 * max_iters)
+
+        variable_parameters_live[3] = step_std_dev_initial_value + (iteration * step_std_dev_change_per_iter)
+
+        #print 'step_std_dev', variable_parameters_live[3]
+
+        ############################################################################################
+        #
+        # copy the updated variable parameter values into the iterations array
+        variable_parameters_iterations[:, iteration+1] = variable_parameters_live
+
+
+    # block completed
+
+    # compute mean competitor popularity scores and add to an array
     #
-    # 0 judge_score_weight
-
-    beta_width_factor = 10.0
-    judge_score_weight_min = 0.0
-    judge_score_weight_max = 0.8
-    judge_score_weight_span = judge_score_weight_max - judge_score_weight_min
-
-    variable_parameter_live = variable_parameters_live[0]
-
-    mode = 1.0 * (variable_parameter_live - judge_score_weight_min) / judge_score_weight_span
-    a = (mode * (1.0 * beta_width_factor - 2.0)) + 1.0
-    b = beta_width_factor - a
-    mode_new = np.random.beta(a, b)
-
-    variable_parameter_variant = (mode_new * judge_score_weight_span) + judge_score_weight_min
-
-    variable_parameters_variant = np.copy(variable_parameters_live)
-    variable_parameters_variant[0] = variable_parameter_variant
-
-    all_series_log_like_variant = all_series_log_likelihood(competitor_series_popularity, variable_parameters_variant)
-
-    base_prob_non_norm = np.exp(all_series_log_like_live) + underflow_avoidance
-    variant_prob_non_norm = np.exp(all_series_log_like_variant) + underflow_avoidance
-    total_prob = base_prob_non_norm + variant_prob_non_norm
-    base_prob_norm = base_prob_non_norm / total_prob
-
-    rand_value = np.random.rand()
-
-    if rand_value > base_prob_norm:
-        select_variant = True
-        # then set live to be equal to the variant
-        variable_parameters_live = np.copy(variable_parameters_variant)
-        all_series_log_like_live = all_series_log_like_variant
-
-    else:
-        select_variant = False
-        # then keep current live values
-
-    #print 'judge_score_weight', variable_parameter_live
-
-    ############################################################################################
+    # start_iter = block_number * block_size
+    # end_iter = start_iter + block_size
     #
-    # 1 epsilon_counts
-
-    # leave fixed for now
-
-    ############################################################################################
+    # for series in series_list:
     #
-    # 2 noise_std_dev
-
-    # leave fixed for now
-
-
-    ############################################################################################
+    #     competitor_popularity_block = competitor_series_popularity_iterations[series, :, start_iter:end_iter]
     #
-    # 3 step_std_dev
-
-    # just do with a learning rate
-
-    step_std_dev_initial_value = variable_parameters_iterations[3][0]
-    step_std_dev_final_value = 0.3
-    step_std_dev_change_per_iter = (step_std_dev_final_value - step_std_dev_initial_value) / (1.0 * num_iters)
-
-    variable_parameters_live[3] = step_std_dev_initial_value + (iteration * step_std_dev_change_per_iter)
-
-    #print 'step_std_dev', variable_parameters_live[3]
-
-    ############################################################################################
+    #     #print np.mean(competitor_popularity_block, axis=1)
     #
-    # copy the updated variable parameter values into the iterations array
-    variable_parameters_iterations[:, iteration] = variable_parameters_live
+    #     row_start = series * max_competitors
+    #     row_end = (series + 1) * max_competitors
+    #
+    #     block_means_array[row_start:row_end, block_number] = np.mean(competitor_popularity_block, axis=1)
+    #
+    # row_start = num_series * max_competitors
+    # row_end = row_start + num_variable_parameters
+    #
+    # variable_parameters_block = variable_parameters_iterations[:, start_iter:end_iter]
+    #
+    # block_means_array[row_start:row_end, block_number] = np.mean(variable_parameters_block, axis=1)
+    #
+    # #print block_means_array
+    #
+    #
+    # # for i in range(block_means_array.shape[0]):
+    # #     print i, block_means_array[i,0]
+    #
+    # #print 'block_number', block_number
+    #
+    # if block_number > 2:
+    #
+    #     block_means_0 = block_means_array[:, block_number]
+    #     block_means_0 = block_means_0[~np.isnan(block_means_0)]
+    #     block_means_a = block_means_array[:, (block_number-1)]
+    #     block_means_a = block_means_a[~np.isnan(block_means_a)]
+    #     block_means_d = block_means_array[:, (block_number-2)]
+    #     block_means_d = block_means_d[~np.isnan(block_means_d)]
+    #
+    #     a = np.linalg.norm(block_means_0 - block_means_a).astype(float)
+    #     d = np.linalg.norm(block_means_0 - block_means_d).astype(float)
+    #     print block_number, "%.4f" % a, "%.4f" % d, "%.2f" % np.divide(d,a)
+    #
+    block_number += 1
+
+    if block_number == max_num_blocks:
+        converged = True  # to exit from while loop
+
+    number_of_blocks = block_number
+
+    print 'number_of_blocks', number_of_blocks
 
 
 # ********************************************************************************************************************
 #
 # Quick and dirty display distributions of popularity and compute expected values
-
-slice_prop = 0.1
-num_slices = 5
 
 for series in series_list:
 
@@ -922,32 +1334,48 @@ for series in series_list:
 
         print competitor, competitor_name
 
-        for slice in range(num_slices):
+        for block in range(number_of_blocks):
 
             # slice_start = (1.0 - (slice_prop * num_slices) + (slice * slice_prop)) * num_iters
-            slice_start = int((1.0 + ((slice - num_slices) * slice_prop)) * num_iters)
-            slice_end = int((1.0 + (((slice + 1) - num_slices) * slice_prop)) * num_iters)
+            block_start_iter = int(block * block_size)
+            block_end_iter = int((block + 1) * block_size)
 
             #print slice_start, slice_end
 
-            competitor_series_popularity_iterations_slice = competitor_series_popularity_iterations[series, competitor,
-                                                    slice_start:slice_end]
+            competitor_series_popularity_iterations_block = competitor_series_popularity_iterations[series, competitor,
+                                                            block_start_iter:block_end_iter]
 
-            competitor_popularity_slice_mean = np.mean(competitor_series_popularity_iterations_slice)
+            competitor_popularity_block_mean = np.mean(competitor_series_popularity_iterations_block)
 
-            print slice_start, 'to', slice_end, "%.3f" % competitor_popularity_slice_mean
+            print block_start_iter, 'to', block_end_iter, "%.3f" % competitor_popularity_block_mean
+
+    for variable_param in range(num_variable_parameters):
+
+        print 'variable_param', variable_param
+
+        for block in range(number_of_blocks):
+            # slice_start = (1.0 - (slice_prop * num_slices) + (slice * slice_prop)) * num_iters
+            block_start_iter = int(block * block_size)
+            block_end_iter = int((block + 1) * block_size)
+
+            variable_parameters_block = variable_parameters_iterations[variable_param, block_start_iter:block_end_iter]
+
+            variable_parameters_block_mean = np.mean(variable_parameters_block)
+
+            print block_start_iter, 'to', block_end_iter, "%.3f" % variable_parameters_block_mean
 
 
-    slice_start = int((1.0 -  (num_slices * slice_prop)) * num_iters)
+    #block_start_iter = int((1.0 - (num_slices * slice_prop)) * max_iters)
 
-    for competitor, competitor_name in competitor_name_dict.items():
+    # for competitor, competitor_name in competitor_name_dict.items():
+    #
+    #     competitor_series_popularity_iterations_block = competitor_series_popularity_iterations[series, competitor,
+    #                                                     block_start_iter:]
+    #     competitor_popularity_block_mean = np.mean(competitor_series_popularity_iterations_block)
+    #
+    #     print competitor, competitor_name, "%.3f" % competitor_popularity_block_mean
 
-        competitor_series_popularity_iterations_slice = competitor_series_popularity_iterations[series, competitor,
-                                                        slice_start:]
-        competitor_popularity_slice_mean = np.mean(competitor_series_popularity_iterations_slice)
-
-        print competitor, competitor_name, "%.3f" % competitor_popularity_slice_mean
-
+sys.exit()
 
 
 # ********************************************************************************************************************
@@ -974,17 +1402,17 @@ for competitor in range(max_competitors):
 # put results into dictionaries
 
 for series in series_list:
-    for slice in range(number_of_slices):
-        slice_start = int(slice * num_iters/number_of_slices)
-        slice_end = int((slice+1) * num_iters/number_of_slices)
+    for block in range(number_of_blocks):
+        block_start_iter = int(block * max_iters / number_of_blocks)
+        block_end_iter = int((block + 1) * max_iters / number_of_blocks)
 
-        results_comp_pop['series'][slice] = series
-        results_comp_pop['iter_start'][slice] = slice_start
-        results_comp_pop['iter_end'][slice] = slice_end
+        results_comp_pop['series'][block] = series
+        results_comp_pop['iter_start'][block] = block_start_iter
+        results_comp_pop['iter_end'][block] = block_end_iter
 
         for competitor in range(max_competitors):
 
-            results_comp_pop[competitor][slice] = np.mean(competitor_series_popularity_iterations[series, competitor, slice_start:slice_end])
+            results_comp_pop[competitor][block] = np.mean(competitor_series_popularity_iterations[series, competitor, block_start_iter:block_end_iter])
 
 # ********************************************************************************************************************
 #
@@ -999,16 +1427,16 @@ results_non_series['epsilon_counts'] = {}
 results_non_series['noise_std_dev'] = {}
 results_non_series['step_std_dev'] = {}
 
-for slice in range(number_of_slices):
-    slice_start = int(slice * num_iters / number_of_slices)
-    slice_end = int((slice + 1) * num_iters / number_of_slices)
+for block in range(number_of_blocks):
+    block_start_iter = int(block * max_iters / number_of_blocks)
+    block_end_iter = int((block + 1) * max_iters / number_of_blocks)
 
-    results_non_series['iter_start'][slice] = slice_start
-    results_non_series['iter_end'][slice] = slice_end
-    results_non_series['judge_score_weight'][slice] = np.mean(variable_parameters_iterations[0, slice_start:slice_end])
-    results_non_series['epsilon_counts'][slice] = np.mean(variable_parameters_iterations[1, slice_start:slice_end])
-    results_non_series['noise_std_dev'][slice] = np.mean(variable_parameters_iterations[2, slice_start:slice_end])
-    results_non_series['step_std_dev'][slice] = np.mean(variable_parameters_iterations[3, slice_start:slice_end])
+    results_non_series['iter_start'][block] = block_start_iter
+    results_non_series['iter_end'][block] = block_end_iter
+    results_non_series['judge_score_weight'][block] = np.mean(variable_parameters_iterations[0, block_start_iter:block_end_iter])
+    results_non_series['epsilon_counts'][block] = np.mean(variable_parameters_iterations[1, block_start_iter:block_end_iter])
+    results_non_series['noise_std_dev'][block] = np.mean(variable_parameters_iterations[2, block_start_iter:block_end_iter])
+    results_non_series['step_std_dev'][block] = np.mean(variable_parameters_iterations[3, block_start_iter:block_end_iter])
 
 
 #################################################################################################
