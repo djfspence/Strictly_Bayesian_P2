@@ -101,14 +101,14 @@ timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 # Key parameters to change
 
 
-num_chains = 3
-block_size = 5
+num_chains = 10
+block_size = 1000
 #converged_blocks = 10
 burn_in_blocks = 1
 converged = False
 convergence_target = 1.001
 block_number = 0
-max_num_blocks = 4
+max_num_blocks = 35
 max_iters = max_num_blocks * block_size + 1
 
 #********************************************************************************************************************
@@ -706,6 +706,242 @@ competitor_in_dance_off[11][13][4] = True
 competitor_in_dance_off[11][14][2] = True
 competitor_in_dance_off[11][14][3] = True
 
+
+#********************************************************************************************************************
+#
+# Series 11 data
+
+#the final (round 13) has two votes so it is considered here as two rounds, 13 and 14
+
+
+series = 12
+
+competitor_name_dict = {}
+competitor_name_dict[1] = 'Caroline Flack'
+competitor_name_dict[2] = 'Frankie Bridge'
+competitor_name_dict[3] = 'Simon Webbe'
+competitor_name_dict[4] = 'Mark Wright'
+competitor_name_dict[5] = 'Jake Wood'
+competitor_name_dict[6] = 'Pixie Lott'
+competitor_name_dict[7] = 'Sunetra Sarker'
+competitor_name_dict[8] = 'Steve Blackshall'
+competitor_name_dict[9] = 'Judy Murray'
+competitor_name_dict[10] = 'Alison Hammond'
+competitor_name_dict[11] = 'Scott Mills'
+competitor_name_dict[12] = 'Thom Evans'
+competitor_name_dict[13] = 'Tim Wonnacott'
+competitor_name_dict[14] = 'Jennifer Gibney'
+competitor_name_dict[15] = 'Gregg Wallace'
+
+competitor_name_by_series_dict[series] = competitor_name_dict
+
+competitor_position_dict = {}
+
+for i in range(15):
+    competitor_position_dict[i+1] = i+1
+
+competitor_position_by_series_dict = {}
+competitor_position_by_series_dict[series] = competitor_position_dict
+
+
+#use max judge score to mormalise judge scores into [0,1]
+max_judge_score[12][2] = 80
+max_judge_score[12][3] = 40
+max_judge_score[12][4] = 40
+max_judge_score[12][5] = 40
+max_judge_score[12][6] = 40
+max_judge_score[12][7] = 40
+max_judge_score[12][8] = 40
+max_judge_score[12][9] = 40
+max_judge_score[12][10] = 40
+max_judge_score[12][11] = 46
+max_judge_score[12][12] = 80
+max_judge_score[12][13] = 80
+max_judge_score[12][14] = 120
+
+judge_score[12][2][1] = 56
+judge_score[12][3][1] = 33
+judge_score[12][4][1] = 33
+judge_score[12][5][1] = 34
+judge_score[12][6][1] = 32
+judge_score[12][7][1] = 31
+judge_score[12][8][1] = 37
+judge_score[12][9][1] = 33
+judge_score[12][10][1] = 39
+judge_score[12][11][1] = 42
+judge_score[12][12][1] = 75
+judge_score[12][13][1] = 80
+judge_score[12][14][1] = 120
+
+judge_score[12][2][2] = 60
+judge_score[12][3][2] = 35
+judge_score[12][4][2] = 32
+judge_score[12][5][2] = 32
+judge_score[12][6][2] = 37
+judge_score[12][7][2] = 32
+judge_score[12][8][2] = 37
+judge_score[12][9][2] = 38
+judge_score[12][10][2] = 36
+judge_score[12][11][2] = 39
+judge_score[12][12][2] = 72
+judge_score[12][13][2] = 77
+judge_score[12][14][2] = 116
+
+judge_score[12][2][3] = 53
+judge_score[12][3][3] = 23
+judge_score[12][4][3] = 31
+judge_score[12][5][3] = 28
+judge_score[12][6][3] = 29
+judge_score[12][7][3] = 33
+judge_score[12][8][3] = 38
+judge_score[12][9][3] = 36
+judge_score[12][10][3] = 38
+judge_score[12][11][3] = 39
+judge_score[12][12][3] = 68
+judge_score[12][13][3] = 78
+judge_score[12][14][3] = 118
+
+judge_score[12][2][4] = 51
+judge_score[12][3][4] = 26
+judge_score[12][4][4] = 29
+judge_score[12][5][4] = 33
+judge_score[12][6][4] = 35
+judge_score[12][7][4] = 31
+judge_score[12][8][4] = 36
+judge_score[12][9][4] = 32
+judge_score[12][10][4] = 32
+judge_score[12][11][4] = 37
+judge_score[12][12][4] = 66
+judge_score[12][13][4] = 70
+
+judge_score[12][2][5] = 63
+judge_score[12][3][5] = 32
+judge_score[12][4][5] = 33
+judge_score[12][5][5] = 31
+judge_score[12][6][5] = 29
+judge_score[12][7][5] = 27
+judge_score[12][8][5] = 36
+judge_score[12][9][5] = 38
+judge_score[12][10][5] = 29
+judge_score[12][11][5] = 39
+judge_score[12][12][5] = 61
+
+judge_score[12][2][6] = 62
+judge_score[12][3][6] = 34
+judge_score[12][4][6] = 32
+judge_score[12][5][6] = 35
+judge_score[12][6][6] = 33
+judge_score[12][7][6] = 36
+judge_score[12][8][6] = 38
+judge_score[12][9][6] = 37
+judge_score[12][10][6] = 38
+judge_score[12][11][6] = 41
+
+judge_score[12][2][7] = 50
+judge_score[12][3][7] = 32
+judge_score[12][4][7] = 27
+judge_score[12][5][7] = 30
+judge_score[12][6][7] = 27
+judge_score[12][7][7] = 31
+judge_score[12][8][7] = 30
+judge_score[12][9][7] = 30
+judge_score[12][10][7] = 27
+
+judge_score[12][2][8] = 47
+judge_score[12][3][8] = 28
+judge_score[12][4][8] = 27
+judge_score[12][5][8] = 30
+judge_score[12][6][8] = 26
+judge_score[12][7][8] = 28
+judge_score[12][8][8] = 31
+judge_score[12][9][8] = 23
+
+judge_score[12][2][9] = 35
+judge_score[12][3][9] = 18
+judge_score[12][4][9] = 22
+judge_score[12][5][9] = 18
+judge_score[12][6][9] = 20
+judge_score[12][7][9] = 18
+judge_score[12][8][9] = 24
+
+judge_score[12][2][10] = 48
+judge_score[12][3][10] = 21
+judge_score[12][4][10] = 27
+judge_score[12][5][10] = 23
+judge_score[12][6][10] = 26
+judge_score[12][7][10] = 27
+
+judge_score[12][2][11] = 36
+judge_score[12][3][11] = 18
+judge_score[12][4][11] = 15
+judge_score[12][5][11] = 19
+judge_score[12][6][11] = 21
+
+judge_score[12][2][12] = 48
+judge_score[12][3][12] = 31
+judge_score[12][4][12] = 31
+judge_score[12][5][12] = 27
+
+judge_score[12][2][13] = 41
+judge_score[12][3][13] = 17
+judge_score[12][4][13] = 19
+
+judge_score[12][2][14] = 37
+judge_score[12][3][14] = 18
+
+judge_score[12][2][15] = 36
+
+#judge scores counting (i.e. if not audience score only...)
+#defaulted to tru so only need to add the false values
+
+judge_score_counts[11][13] = False
+judge_score_counts[11][14] = False
+
+#input dance-offs
+
+competitor_in_dance_off[12][2][14] = True
+competitor_in_dance_off[12][2][15] = True
+
+competitor_in_dance_off[12][3][3] = True
+competitor_in_dance_off[12][3][14] = True
+
+competitor_in_dance_off[12][4][4] = True
+competitor_in_dance_off[12][4][13] = True
+
+competitor_in_dance_off[12][5][3] = True
+competitor_in_dance_off[12][5][12] = True
+
+competitor_in_dance_off[12][6][10] = True
+competitor_in_dance_off[12][6][11] = True
+
+competitor_in_dance_off[12][7][1] = True
+competitor_in_dance_off[12][7][10] = True
+
+competitor_in_dance_off[12][8][7] = True
+competitor_in_dance_off[12][8][9] = True
+
+competitor_in_dance_off[12][9][7] = True
+competitor_in_dance_off[12][9][8] = True
+
+competitor_in_dance_off[12][10][4] = True
+competitor_in_dance_off[12][10][7] = True
+
+competitor_in_dance_off[12][11][3] = True
+competitor_in_dance_off[12][11][6] = True
+
+competitor_in_dance_off[12][12][4] = True
+competitor_in_dance_off[12][12][5] = True
+
+competitor_in_dance_off[12][12][4] = True
+competitor_in_dance_off[12][12][5] = True
+
+
+#one person eliminated directly
+competitor_in_dance_off[12][13][4] = True
+
+#i.e. the two runners-up
+competitor_in_dance_off[12][14][2] = True
+competitor_in_dance_off[12][14][3] = True
 
 
 #********************************************************************************************************************
