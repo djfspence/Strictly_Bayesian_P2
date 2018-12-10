@@ -4,7 +4,7 @@ __author__ = 'David'
 #
 # Estimation of audience scores in Strictly Come Dancing using MCMC
 
-# 20 November 2018
+# 10 December 2018
 
 
 #********************************************************************************************************************
@@ -77,6 +77,14 @@ __author__ = 'David'
 # Susanna also beat Sophie Ellis B in round 13 on audience scores BUT again SEB looks to be more popular
 
 
+# 8. Series 16
+
+# add the data once series is over
+# see how Sean and Katya's kiss on Oct8th impacted his popularity - compare popularity based on results before
+# with results after
+# same set of contestants?
+
+
 #********************************************************************************************************************
 #
 # Imports
@@ -101,21 +109,21 @@ timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 # Key parameters to change
 
 
-num_chains = 10
-block_size = 1000
+num_chains = 5
+block_size = 5
 #converged_blocks = 10
 burn_in_blocks = 1
 converged = False
 convergence_target = 1.001
 block_number = 0
-max_num_blocks = 35
+max_num_blocks = 2
 max_iters = max_num_blocks * block_size + 1
 
 #********************************************************************************************************************
 #
 # Fixed parameters
 
-num_series = 15
+num_series = 16
 max_rounds = 20
 max_competitors = 20
 num_variable_parameters = 4
@@ -148,6 +156,9 @@ max_judge_score_norm = 1.0
 competitor_series_popularity_iterations = np.zeros((num_chains, num_series, max_competitors, max_iters))
 competitor_series_popularity_iterations[:] = np.nan
 
+competitor_series_popularity_blocks = np.zeros((num_chains, num_series, max_competitors, max_num_blocks))
+competitor_series_popularity_blocks[:] = np.nan
+
 # variable_parameters_current = np.zeros((num_variable_parameters))
 # variable_parameters_current[:] = np.nan
 #
@@ -156,6 +167,9 @@ competitor_series_popularity_iterations[:] = np.nan
 
 variable_parameters_iterations = np.zeros((num_chains, num_variable_parameters, max_iters))
 variable_parameters_iterations[:] = np.nan
+
+variable_parameters_blocks = np.zeros((num_chains, num_variable_parameters, max_num_blocks))
+variable_parameters_blocks[:] = np.nan
 
 # log_likelihood_series_current = np.zeros(num_series)  #need to initialise this on first run
 # log_likelihood_series_current[:] = np.nan
@@ -174,6 +188,12 @@ series_log_like_live_array[:] = np.nan
 # array for holding the convergence values
 max_conv_block = np.zeros(max_num_blocks)
 max_conv_block[:] = np.nan
+
+conv_params_comp = np.zeros((num_series, max_competitors, max_num_blocks))
+conv_params_comp[:] = np.nan
+
+conv_params_var_params = np.zeros((num_variable_parameters, max_num_blocks))
+conv_params_var_params[:] = np.nan
 
 
 
@@ -709,7 +729,7 @@ competitor_in_dance_off[11][14][3] = True
 
 #********************************************************************************************************************
 #
-# Series 11 data
+# Series 12 data
 
 #the final (round 13) has two votes so it is considered here as two rounds, 13 and 14
 
@@ -894,8 +914,8 @@ judge_score[12][2][15] = 36
 #judge scores counting (i.e. if not audience score only...)
 #defaulted to tru so only need to add the false values
 
-judge_score_counts[11][13] = False
-judge_score_counts[11][14] = False
+judge_score_counts[12][13] = False
+judge_score_counts[12][14] = False
 
 #input dance-offs
 
@@ -943,6 +963,240 @@ competitor_in_dance_off[12][13][4] = True
 competitor_in_dance_off[12][14][2] = True
 competitor_in_dance_off[12][14][3] = True
 
+#********************************************************************************************************************
+#
+# Series 13 data
+
+#the final (round 13) has two votes so it is considered here as two rounds, 13 and 14
+
+
+series = 13
+
+competitor_name_dict = {}
+competitor_name_dict[1] = 'Jay McGuiness'
+competitor_name_dict[2] = 'Georgia May Foote'
+competitor_name_dict[3] = 'Kellie Bright'
+competitor_name_dict[4] = 'Katie Derham'
+competitor_name_dict[5] = 'Anita Rani'
+competitor_name_dict[6] = 'Helen George'
+competitor_name_dict[7] = 'Peter Andre'
+competitor_name_dict[8] = 'Jamelia'
+competitor_name_dict[9] = 'Jeremy Vine'
+competitor_name_dict[10] = 'Carol Kirkwood'
+competitor_name_dict[11] = 'Kirsty Gallacher'
+competitor_name_dict[12] = 'Ainsley Harriott'
+competitor_name_dict[13] = "Daniel O'Donnell"
+competitor_name_dict[14] = 'Anthony Ogogo'
+competitor_name_dict[15] = 'Iwan Thomas'
+
+competitor_name_by_series_dict[series] = competitor_name_dict
+
+competitor_position_dict = {}
+
+for i in range(15):
+    competitor_position_dict[i+1] = i+1
+
+competitor_position_by_series_dict = {}
+competitor_position_by_series_dict[series] = competitor_position_dict
+
+
+#use max judge score to mormalise judge scores into [0,1]
+max_judge_score[13][2] = 80
+max_judge_score[13][3] = 40
+max_judge_score[13][4] = 40
+max_judge_score[13][5] = 40
+max_judge_score[13][6] = 40
+max_judge_score[13][7] = 40
+max_judge_score[13][8] = 40
+max_judge_score[13][9] = 40
+max_judge_score[13][10] = 47
+max_judge_score[13][11] = 40
+max_judge_score[13][12] = 80
+max_judge_score[13][13] = 80
+max_judge_score[13][14] = 120
+
+judge_score[13][2][1] = 58
+judge_score[13][3][1] = 37
+judge_score[13][4][1] = 25
+judge_score[13][5][1] = 33
+judge_score[13][6][1] = 34
+judge_score[13][7][1] = 34
+judge_score[13][8][1] = 30
+judge_score[13][9][1] = 36
+judge_score[13][10][1] = 41
+judge_score[13][11][1] = 39
+judge_score[13][12][1] = 71
+judge_score[13][13][1] = 71
+judge_score[13][14][1] = 110
+
+judge_score[13][2][2] = 52
+judge_score[13][3][2] = 27
+judge_score[13][4][2] = 31
+judge_score[13][5][2] = 31
+judge_score[13][6][2] = 35
+judge_score[13][7][2] = 35
+judge_score[13][8][2] = 39
+judge_score[13][9][2] = 38
+judge_score[13][10][2] = 39
+judge_score[13][11][2] = 36
+judge_score[13][12][2] = 71
+judge_score[13][13][2] = 72
+judge_score[13][14][2] = 112
+
+judge_score[13][2][3] = 54
+judge_score[13][3][3] = 32
+judge_score[13][4][3] = 32
+judge_score[13][5][3] = 35
+judge_score[13][6][3] = 28
+judge_score[13][7][3] = 32
+judge_score[13][8][3] = 33
+judge_score[13][9][3] = 37
+judge_score[13][10][3] = 36
+judge_score[13][11][3] = 36
+judge_score[13][12][3] = 73
+judge_score[13][13][3] = 80
+judge_score[13][14][3] = 119
+
+judge_score[13][2][4] = 54
+judge_score[13][3][4] = 20
+judge_score[13][4][4] = 33
+judge_score[13][5][4] = 21
+judge_score[13][6][4] = 21
+judge_score[13][7][4] = 26
+judge_score[13][8][4] = 31
+judge_score[13][9][4] = 35
+judge_score[13][10][4] = 37
+judge_score[13][11][4] = 35
+judge_score[13][12][4] = 56
+judge_score[13][13][4] = 62
+
+judge_score[13][2][5] = 54
+judge_score[13][3][5] = 29
+judge_score[13][4][5] = 27
+judge_score[13][5][5] = 32
+judge_score[13][6][5] = 29
+judge_score[13][7][5] = 34
+judge_score[13][8][5] = 32
+judge_score[13][9][5] = 37
+judge_score[13][10][5] = 35
+judge_score[13][11][5] = 31
+judge_score[13][12][5] = 64
+
+judge_score[13][2][6] = 58
+judge_score[13][3][6] = 32
+judge_score[13][4][6] = 32
+judge_score[13][5][6] = 35
+judge_score[13][6][6] = 34
+judge_score[13][7][6] = 31
+judge_score[13][8][6] = 34
+judge_score[13][9][6] = 34
+judge_score[13][10][6] = 46
+judge_score[13][11][6] = 34
+
+judge_score[13][2][7] = 60
+judge_score[13][3][7] = 28
+judge_score[13][4][7] = 32
+judge_score[13][5][7] = 29
+judge_score[13][6][7] = 28
+judge_score[13][7][7] = 38
+judge_score[13][8][7] = 34
+judge_score[13][9][7] = 29
+judge_score[13][10][7] = 32
+
+judge_score[13][2][8] = 42
+judge_score[13][3][8] = 25
+judge_score[13][4][8] = 32
+judge_score[13][5][8] = 26
+judge_score[13][6][8] = 26
+judge_score[13][7][8] = 28
+judge_score[13][8][8] = 26
+judge_score[13][9][8] = 31
+
+judge_score[13][2][9] = 36
+judge_score[13][3][9] = 24
+judge_score[13][4][9] = 20
+judge_score[13][5][9] = 18
+judge_score[13][6][9] = 22
+judge_score[13][7][9] = 21
+judge_score[13][8][9] = 21
+
+judge_score[13][2][10] = 36
+judge_score[13][3][10] = 17
+judge_score[13][4][10] = 22
+judge_score[13][5][10] = 21
+judge_score[13][6][10] = 13
+judge_score[13][7][10] = 17
+
+judge_score[13][2][11] = 40
+judge_score[13][3][11] = 23
+judge_score[13][4][11] = 21
+judge_score[13][5][11] = 29
+judge_score[13][6][11] = 17
+
+judge_score[13][2][12] = 46
+judge_score[13][3][12] = 20
+judge_score[13][4][12] = 26
+judge_score[13][5][12] = 21
+
+judge_score[13][2][13] = 47
+judge_score[13][3][13] = 21
+judge_score[13][4][13] = 23
+
+judge_score[13][2][14] = 40
+judge_score[13][3][14] = 19
+
+judge_score[13][2][15] = 30
+
+
+#judge scores counting (i.e. if not audience score only...)
+#defaulted to tru so only need to add the false values
+
+judge_score_counts[13][13] = False
+judge_score_counts[13][14] = False
+
+#input dance-offs
+
+competitor_in_dance_off[13][2][15] = True
+competitor_in_dance_off[13][2][8] = True
+
+competitor_in_dance_off[13][3][14] = True
+competitor_in_dance_off[13][3][12] = True
+
+competitor_in_dance_off[13][4][13] = True
+competitor_in_dance_off[13][4][11] = True
+
+competitor_in_dance_off[13][5][12] = True
+competitor_in_dance_off[13][5][8] = True
+
+competitor_in_dance_off[13][6][11] = True
+competitor_in_dance_off[13][6][8] = True
+
+competitor_in_dance_off[13][7][10] = True
+competitor_in_dance_off[13][7][3] = True
+
+competitor_in_dance_off[13][8][9] = True
+competitor_in_dance_off[13][8][8] = True
+
+competitor_in_dance_off[13][9][8] = True
+competitor_in_dance_off[13][9][7] = True
+
+competitor_in_dance_off[13][10][7] = True
+competitor_in_dance_off[13][10][3] = True
+
+competitor_in_dance_off[13][11][6] = True
+competitor_in_dance_off[13][11][2] = True
+
+competitor_in_dance_off[13][12][5] = True
+competitor_in_dance_off[13][12][4] = True
+
+#one person eliminated directly
+competitor_in_dance_off[13][13][4] = True
+
+#i.e. the two runners-up
+competitor_in_dance_off[13][14][2] = True
+competitor_in_dance_off[13][14][3] = True
+
+
 
 #********************************************************************************************************************
 #
@@ -958,7 +1212,7 @@ competitor_in_dance_off[12][14][3] = True
 # Judge Rinder & Oksana	5	25	27	52	27	27	29	32	33	33	33	29+2=31	31
 # Ed & Katya	        6	21	23	44	24	16	18	26	27	25	23	23+1=24
 # Greg & Natalie	    7	27	26	53	32	28	24	26	32	31	32
-# Daisy & 	        8	32	30	62	31	31	32	33	34	31
+# Daisy & 	             8	32	30	62	31	31	32	33	34	31
 # Laura & Giovanni	    9	25	32	57	30	33		36	32
 # Anastacia & Brendan	10	28	22	50	27	27	30	25
 # Lesley & Anton	    11	23	26	49	27	31	24
@@ -1209,6 +1463,228 @@ competitor_in_dance_off[14][12][4] = True
 competitor_in_dance_off[14][13][2] = True
 competitor_in_dance_off[14][13][3] = True
 
+
+
+#********************************************************************************************************************
+#
+# Series 15
+
+series = 15
+
+competitor_name_dict = {}
+competitor_name_dict[1] = 'Joe McFadden'
+competitor_name_dict[2] = 'Alexandra Burke'
+competitor_name_dict[3] = 'Debbie McGee'
+competitor_name_dict[4] = 'Gemma Atkinson'
+competitor_name_dict[5] = 'Mollie King'
+competitor_name_dict[6] = 'Davood Ghadami'
+competitor_name_dict[7] = 'Susan Calman'
+competitor_name_dict[8] = 'Jonnie Peacock'
+competitor_name_dict[9] = 'Ruth Langsford'
+competitor_name_dict[10] = 'Aston Merrygold'
+competitor_name_dict[11] = 'Simon Rimmer'
+competitor_name_dict[12] = 'Brian Conley'
+competitor_name_dict[13] = 'Charlotte Hawkins'
+competitor_name_dict[14] = 'Rev. Richard Coles'
+competitor_name_dict[15] = 'Chizzy Akudolu'
+
+competitor_name_by_series_dict[series] = competitor_name_dict
+
+competitor_position_dict = {}
+
+for i in range(15):
+    competitor_position_dict[i+1] = i+1
+
+competitor_position_by_series_dict = {}
+competitor_position_by_series_dict[series] = competitor_position_dict
+
+
+#use max judge score to mormalise judge scores into [0,1]
+max_judge_score[15][2] = 80
+max_judge_score[15][3] = 40
+max_judge_score[15][4] = 40
+max_judge_score[15][5] = 30
+max_judge_score[15][6] = 40
+max_judge_score[15][7] = 40
+max_judge_score[15][8] = 40
+max_judge_score[15][9] = 40
+max_judge_score[15][10] = 47
+max_judge_score[15][11] = 40
+max_judge_score[15][12] = 80
+max_judge_score[15][13] = 120
+
+judge_score[15][2][1] = 51
+judge_score[15][3][1] = 32
+judge_score[15][4][1] = 24
+judge_score[15][5][1] = 26
+judge_score[15][6][1] = 32
+judge_score[15][7][1] = 36
+judge_score[15][8][1] = 33
+judge_score[15][9][1] = 34
+judge_score[15][10][1] = 44
+judge_score[15][11][1] = 37
+judge_score[15][12][1] = 70
+judge_score[15][13][1] = 118
+
+judge_score[15][2][2] = 60
+judge_score[15][3][2] = 33
+judge_score[15][4][2] = 39
+judge_score[15][5][2] = 23
+judge_score[15][6][2] = 35
+judge_score[15][7][2] = 39
+judge_score[15][8][2] = 38
+judge_score[15][9][2] = 39
+judge_score[15][10][2] = 39
+judge_score[15][11][2] = 39
+judge_score[15][12][2] = 79
+judge_score[15][13][2] = 119
+
+judge_score[15][2][3] = 64
+judge_score[15][3][3] = 29
+judge_score[15][4][3] = 27
+judge_score[15][5][3] = 27
+judge_score[15][6][3] = 39
+judge_score[15][7][3] = 40
+judge_score[15][8][3] = 35
+judge_score[15][9][3] = 33
+judge_score[15][10][3] = 43
+judge_score[15][11][3] = 39
+judge_score[15][12][3] = 70
+judge_score[15][13][3] = 117
+
+judge_score[15][2][4] = 46
+judge_score[15][3][4] = 31
+judge_score[15][4][4] = 35
+judge_score[15][5][4] = 24
+judge_score[15][6][4] = 30
+judge_score[15][7][4] = 26
+judge_score[15][8][4] = 28
+judge_score[15][9][4] = 38
+judge_score[15][10][4] = 28
+judge_score[15][11][4] = 29
+judge_score[15][12][4] = 62
+judge_score[15][13][4] = 114
+
+judge_score[15][2][5] = 48
+judge_score[15][3][5] = 30
+judge_score[15][4][5] = 27
+judge_score[15][5][5] = 24
+judge_score[15][6][5] = 27
+judge_score[15][7][5] = 27
+judge_score[15][8][5] = 22
+judge_score[15][9][5] = 29
+judge_score[15][10][5] = 33
+judge_score[15][11][5] = 31
+judge_score[15][12][5] = 56
+
+judge_score[15][2][6] = 54
+judge_score[15][3][6] = 25
+judge_score[15][4][6] = 29
+judge_score[15][5][6] = 22
+judge_score[15][6][6] = 25
+judge_score[15][7][6] = 35
+judge_score[15][8][6] = 38
+judge_score[15][9][6] = 35
+judge_score[15][10][6] = 39
+judge_score[15][11][6] = 29
+
+judge_score[15][2][7] = 42
+judge_score[15][3][7] = 20
+judge_score[15][4][7] = 30
+judge_score[15][5][7] = 16
+judge_score[15][6][7] = 18
+judge_score[15][7][7] = 29
+judge_score[15][8][7] = 27
+judge_score[15][9][7] = 25
+judge_score[15][10][7] = 22
+
+judge_score[15][2][8] = 49
+judge_score[15][3][8] = 26
+judge_score[15][4][8] = 31
+judge_score[15][5][8] = 24
+judge_score[15][6][8] = 20
+judge_score[15][7][8] = 27
+judge_score[15][8][8] = 21
+judge_score[15][9][8] = 26
+
+judge_score[15][2][9] = 36
+judge_score[15][3][9] = 15
+judge_score[15][4][9] = 24
+judge_score[15][5][9] = 16
+judge_score[15][6][9] = 22
+judge_score[15][7][9] = 22
+judge_score[15][8][9] = 18
+
+judge_score[15][2][10] = 63
+judge_score[15][3][10] = 35
+judge_score[15][4][10] = 32
+judge_score[15][5][10] = 24
+judge_score[15][6][10] = 28
+judge_score[15][7][10] = 25
+
+judge_score[15][2][11] = 36
+judge_score[15][3][11] = 19
+judge_score[15][4][11] = 19
+judge_score[15][5][11] = 16
+judge_score[15][6][11] = 16
+
+judge_score[15][2][12] = 35
+judge_score[15][3][12] = 22
+judge_score[15][4][12] = 21
+judge_score[15][5][12] = 16
+
+judge_score[15][2][13] = 34
+judge_score[15][3][13] = 17
+judge_score[15][4][13] = 19
+
+judge_score[15][2][14] = 34
+judge_score[15][3][14] = 14
+
+judge_score[15][2][15] = 37
+
+judge_score_counts[15][13] = False
+
+#input dance-offs
+
+competitor_in_dance_off[15][2][15] = True
+competitor_in_dance_off[15][2][12] = True
+
+competitor_in_dance_off[15][3][14] = True
+competitor_in_dance_off[15][3][11] = True
+
+competitor_in_dance_off[15][4][13] = True
+competitor_in_dance_off[15][4][6] = True
+
+competitor_in_dance_off[15][5][12] = True
+competitor_in_dance_off[15][5][11] = True
+
+competitor_in_dance_off[15][6][11] = True
+competitor_in_dance_off[15][6][5] = True
+
+competitor_in_dance_off[15][7][10] = True
+competitor_in_dance_off[15][7][5] = True
+
+competitor_in_dance_off[15][8][9] = True
+competitor_in_dance_off[15][8][8] = True
+
+competitor_in_dance_off[15][9][8] = True
+competitor_in_dance_off[15][9][3] = True
+
+competitor_in_dance_off[15][10][7] = True
+competitor_in_dance_off[15][10][2] = True
+
+competitor_in_dance_off[15][11][6] = True
+competitor_in_dance_off[15][11][2] = True
+
+competitor_in_dance_off[15][12][5] = True
+competitor_in_dance_off[15][12][4] = True
+
+competitor_in_dance_off[15][13][2] = True
+competitor_in_dance_off[15][13][3] = True
+competitor_in_dance_off[15][13][4] = True
+
+
+
 for k, v in competitor_name_dict.items():
     print k, v
 
@@ -1385,6 +1861,10 @@ for chain in range(num_chains):
 
     # std dev of the normal distribution from which the next step is taken
     variable_parameters_iterations[chain][3][0] = 1.0
+
+
+
+
 
 
 #********************************************************************************************************************
@@ -1570,13 +2050,24 @@ while not converged:
         if conv_stat_comp_max > max_conv:
             max_conv = conv_stat_comp_max
 
+        # conv_params_comp = np.array[num_series][max_competitors][max_num_blocks]
+        # conv_params_comp[:] = np.nan
+
+        conv_params_comp[series, :, block_number] = conv_stat_comp
+
+
     # only interested in parameter 0
-    conv_stat_var_param = gelman_rubin_diagnostic(variable_parameters_iterations[:, :, start_iter:end_iter])[0]
+    conv_stat_var_params = gelman_rubin_diagnostic(variable_parameters_iterations[:, :, start_iter:end_iter])
 
-    print 'conv_stat_var_param', conv_stat_var_param
+    # conv_params_var_params = np.array[num_variable_parameters][max_num_blocks]
+    # conv_params_var_params[:] = np.nan
 
-    if conv_stat_var_param > max_conv:
-        max_conv = conv_stat_var_param
+    conv_params_var_params[:, block_number] = conv_stat_var_params
+
+    print 'conv_stat_var_params', conv_stat_var_params
+
+    if np.nanmax(conv_stat_var_params) > max_conv:
+        max_conv = np.nanmax(conv_stat_var_params)
 
     print 'max_conv', max_conv
 
@@ -1594,6 +2085,17 @@ while not converged:
     number_of_blocks = block_number
 
     print 'number_of_blocks', number_of_blocks
+
+# ********************************************************************************************************************
+#
+# Test
+
+for series in range(num_series):
+    for block in range(max_num_blocks):
+        print series, block
+        print conv_params_comp[series, :, block]
+
+
 
 
 # ********************************************************************************************************************
@@ -1663,9 +2165,12 @@ results_comp_pop['series'] = {}
 results_comp_pop['block'] = {}
 results_comp_pop['iter_start'] = {}
 results_comp_pop['iter_end'] = {}
+results_comp_pop['conv_param'] = {}
 
 for competitor in range(max_competitors):
-    results_comp_pop[competitor] = {}
+    results_comp_pop['c_' + str(competitor)] = {}
+    results_comp_pop['grcp_c_' + str(competitor)] = {}
+
 
 # put results into dictionaries
 
@@ -1685,7 +2190,8 @@ for series in series_list:
 
         for competitor in range(max_competitors):
 
-            results_comp_pop[competitor][row] = np.mean(competitor_series_popularity_iterations[:, series, competitor, block_start_iter:block_end_iter])
+            results_comp_pop['c_' + str(competitor)][row] = np.mean(competitor_series_popularity_iterations[:, series, competitor, block_start_iter:block_end_iter])
+            results_comp_pop['grcp_c_' + str(competitor)][row] = conv_params_comp[series, competitor, block]
 
 # ********************************************************************************************************************
 #
@@ -1702,6 +2208,11 @@ results_non_series['noise_std_dev'] = {}
 results_non_series['step_std_dev'] = {}
 results_non_series['max_conv'] = {}
 
+results_non_series['grcp_judge_score_weight'] = {}
+results_non_series['grcp_epsilon_counts'] = {}
+results_non_series['grcp_noise_std_dev'] = {}
+results_non_series['grcp_step_std_dev'] = {}
+
 for block in range(number_of_blocks):
     block_start_iter = int(block * max_iters / number_of_blocks)
     block_end_iter = int((block + 1) * max_iters / number_of_blocks)
@@ -1714,6 +2225,13 @@ for block in range(number_of_blocks):
     results_non_series['noise_std_dev'][block] = np.mean(variable_parameters_iterations[:, 2, block_start_iter:block_end_iter])
     results_non_series['step_std_dev'][block] = np.mean(variable_parameters_iterations[:, 3, block_start_iter:block_end_iter])
     results_non_series['max_conv'][block] = max_conv_block[block]
+
+    results_non_series['grcp_judge_score_weight'][block] = conv_params_var_params[0, block]
+    results_non_series['grcp_epsilon_counts'][block] = conv_params_var_params[1, block]
+    results_non_series['grcp_noise_std_dev'][block] = conv_params_var_params[2, block]
+    results_non_series['grcp_step_std_dev'][block] = conv_params_var_params[3, block]
+
+
 
 #################################################################################################
 #
